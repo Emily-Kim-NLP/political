@@ -1,0 +1,18 @@
+# Python
+backend/venv/
+backend/__pycache__/
+backend/*.pyc
+backend/.env
+
+# Secrets — never commit
+backend/credentials.json
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# Data (raw Excel)
+data/*.xlsx
+
+# OS
+.DS_Store
