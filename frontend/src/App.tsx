@@ -7,6 +7,7 @@ import IntroPage from './components/IntroPage'
 import ConsentPage from './components/ConsentPage'
 import BasicInfoPage from './components/BasicInfoPage'
 import LikertPage from './components/LikertPage'
+import OrientationPage from './components/OrientationPage'
 import type {
   Session, ResponsePayload, Orientation, Step,
   ParticipantInfo, LikertAnswers, AppStage,
@@ -35,9 +36,6 @@ export default function App() {
   const [saveError, setSaveError]       = useState<string | null>(null)
   const [likertSaving, setLikertSaving] = useState(false)
 
-  // ── Completion ────────────────────────────────────────────────
-  const [analysis, setAnalysis]         = useState<string | null>(null)
-  const [analyzing, setAnalyzing]       = useState(false)
 
   // session은 앱 시작 시 바로 발급
   useEffect(() => { initSession() }, [])
@@ -59,16 +57,21 @@ export default function App() {
 
   async function handleBasicInfoNext(info: ParticipantInfo) {
     if (!session) return
+    setStage('orientation')  // 즉시 전환 → 버튼 중복 클릭 방지
     try {
       await axios.post('/participant', {
-        participant_id: session.participant_id,
-        ...info,
-        consent: true,
+        participant_id:    session.participant_id,
+        age:               info.age,
+        grade:             info.grade,
+        major:             info.major,
+        phone:             info.phone,
+        gender:            info.gender,
+        us_interest_level: info.usInterestLevel,
+        consent:           true,
       })
     } catch {
       // 저장 실패해도 실험은 진행
     }
-    setStage('experiment')
   }
 
   function handleDisagree() {
@@ -85,6 +88,7 @@ export default function App() {
       article_id:     currentArticle.article_id,
       domain:         currentArticle.domain,
       version:        currentArticle.version,
+      category:       currentArticle.category,
       q1_label:       q1,
       q2_sentence:    q2,
       q3_bi:          q3,
@@ -124,22 +128,6 @@ export default function App() {
       setLikertSaving(false)
     }
     setStage('completed')
-    requestAnalysis(session.participant_id, responses)
-  }
-
-  async function requestAnalysis(participantId: string, allResponses: ResponsePayload[]) {
-    setAnalyzing(true)
-    try {
-      const res = await axios.post<{ analysis: string }>('/analyze', {
-        participant_id: participantId,
-        responses: allResponses,
-      })
-      setAnalysis(res.data.analysis)
-    } catch {
-      setAnalysis(null)
-    } finally {
-      setAnalyzing(false)
-    }
   }
 
   function handleNext() {
@@ -212,27 +200,6 @@ export default function App() {
             참여자 ID: <strong style={{ color: '#374151' }}>{session?.participant_id}</strong>
           </p>
 
-          <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 24, textAlign: 'left' }}>
-            <p style={{ fontSize: 13, fontWeight: 600, color: '#6b7280', marginBottom: 12 }}>
-              AI 응답 패턴 분석
-            </p>
-            {analyzing ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div className="spinner" style={{ width: 20, height: 20, borderWidth: 3 } as React.CSSProperties} />
-                <span style={{ fontSize: 13, color: '#9ca3af' }}>분석 중...</span>
-              </div>
-            ) : analysis ? (
-              <p style={{
-                fontSize: 14, lineHeight: 1.8, color: '#374151',
-                background: '#f9fafb', borderRadius: 10, padding: '14px 16px',
-                border: '1px solid #e5e7eb',
-              }}>
-                {analysis}
-              </p>
-            ) : (
-              <p style={{ fontSize: 13, color: '#9ca3af' }}>분석을 불러올 수 없습니다.</p>
-            )}
-          </div>
         </div>
       </div>
     )
@@ -241,6 +208,11 @@ export default function App() {
   // ── Stage: likert ─────────────────────────────────────────────
   if (stage === 'likert') {
     return <LikertPage onSubmit={handleLikertSubmit} saving={likertSaving} />
+  }
+
+  // ── Stage: orientation ───────────────────────────────────────
+  if (stage === 'orientation') {
+    return <OrientationPage onNext={() => setStage('experiment')} />
   }
 
   // ── Stage: experiment ─────────────────────────────────────────
@@ -287,6 +259,7 @@ export default function App() {
         />
         <QuestionPanel
           step={step}
+          category={currentArticle.category}
           q1={q1} setQ1={setQ1}
           q2={q2}
           q3={q3} setQ3={setQ3}

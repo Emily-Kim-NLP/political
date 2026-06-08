@@ -114,9 +114,6 @@ export default function BasicInfoPage({ onNext }: Props) {
               placeholder="010-0000-0000"
               style={inputStyle}
             />
-            <p style={couponNoticeStyle}>
-              📱 핸드폰 번호를 정확하게 기입하셔야 실험 참여 완료 후 <strong>쿠폰을 수령</strong>하실 수 있습니다.
-            </p>
           </div>
 
           {/* 미국정치 관심도 */}
@@ -204,10 +201,4 @@ const inputStyle: React.CSSProperties = {
   width: '100%', padding: '11px 14px', borderRadius: 8,
   border: '1.5px solid #e5e7eb', fontSize: 15,
   outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit',
-}
-
-const couponNoticeStyle: React.CSSProperties = {
-  fontSize: 12, color: '#f59e0b', marginTop: 6,
-  background: '#fffbeb', padding: '8px 12px', borderRadius: 6,
-  border: '1px solid #fde68a', lineHeight: 1.6,
 }

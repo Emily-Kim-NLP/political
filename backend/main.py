@@ -1,4 +1,5 @@
 import uuid
+import sqlite3
 from datetime import datetime, timezone
 
 from fastapi import FastAPI, HTTPException
@@ -22,6 +23,85 @@ load_dotenv()
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173").split(",")
 GPT_MODEL = "gpt-5.4"
 
+_BUFFER_DB  = os.path.join(os.path.dirname(__file__), "..", "data", "assignment.db")
+_N_ARTICLES = 12  # 4 domains × 3 articles each
+
+
+def _init_response_buffer():
+    with sqlite3.connect(_BUFFER_DB) as conn:
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS response_buffer (
+                participant_id TEXT,
+                article_id     TEXT,
+                domain         TEXT,
+                q1_label       TEXT,
+                q2_sentence    INTEGER,
+                q3_bi          TEXT,
+                q3_other       TEXT,
+                correct        TEXT,
+                submitted_at   TEXT,
+                PRIMARY KEY (participant_id, article_id)
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS response_written (
+                participant_id TEXT PRIMARY KEY
+            )
+        """)
+        conn.commit()
+
+
+_init_response_buffer()
+
+
+def _buffer_response(payload, correct: str) -> tuple[int, bool]:
+    """Insert response into buffer. Returns (total_count, already_written_to_sheets)."""
+    with sqlite3.connect(_BUFFER_DB) as conn:
+        conn.execute("PRAGMA journal_mode=WAL")
+        already = conn.execute(
+            "SELECT 1 FROM response_written WHERE participant_id = ?",
+            (payload.participant_id,)
+        ).fetchone()
+        if already:
+            return 0, True
+        conn.execute("""
+            INSERT OR REPLACE INTO response_buffer
+            (participant_id, article_id, domain, q1_label, q2_sentence,
+             q3_bi, q3_other, correct, submitted_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            payload.participant_id, payload.article_id, payload.domain,
+            payload.q1_label, payload.q2_sentence,
+            payload.q3_bi, payload.q3_other or "",
+            correct, datetime.now(timezone.utc).isoformat()
+        ))
+        count = conn.execute(
+            "SELECT COUNT(*) FROM response_buffer WHERE participant_id = ?",
+            (payload.participant_id,)
+        ).fetchone()[0]
+        conn.commit()
+    return count, False
+
+
+def _get_buffered_responses(participant_id: str) -> list:
+    with sqlite3.connect(_BUFFER_DB) as conn:
+        return conn.execute(
+            """SELECT article_id, domain, q1_label, q2_sentence, q3_bi, q3_other, correct
+               FROM response_buffer WHERE participant_id = ?
+               ORDER BY submitted_at""",
+            (participant_id,)
+        ).fetchall()
+
+
+def _mark_response_written(participant_id: str):
+    with sqlite3.connect(_BUFFER_DB) as conn:
+        conn.execute(
+            "INSERT OR IGNORE INTO response_written (participant_id) VALUES (?)",
+            (participant_id,)
+        )
+        conn.commit()
+
 app = FastAPI()
 openai_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
@@ -36,11 +116,11 @@ app.add_middleware(
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
 
 BI_LABELS = {
-    "BI1": "자극적·평가적 단어",
+    "BI1": "가치·관점 암시 단어",
     "BI2": "해석의 사실화",
-    "BI3": "특정 인물·정책 묘사",
+    "BI3": "특정 정치인·정당·정책 묘사",
     "BI4": "한쪽 입장 강조",
-    "BI5": "편향된 인용",
+    "BI5": "한쪽 입장 주로 인용",
     "BI6": "선택적 사실 제시",
     "기타": "기타",
 }
@@ -100,19 +180,18 @@ async def save_likert(payload: LikertPayload):
 @app.post("/response")
 async def save_response(payload: ResponsePayload):
     try:
-        await ensure_header()
-        row = [
-            datetime.now(timezone.utc).isoformat(),
-            payload.participant_id,
-            payload.article_id,
-            payload.domain,
-            payload.version,
-            payload.q1_label,
-            payload.q2_sentence,
-            payload.q3_bi,
-            payload.q3_other or "",
-        ]
-        await append_response(row)
+        correct = "O" if payload.q1_label == payload.version else "X"
+        count, already_written = _buffer_response(payload, correct)
+
+        if not already_written and count >= _N_ARTICLES:
+            buffered = _get_buffered_responses(payload.participant_id)
+            await ensure_header()
+            row = [datetime.now(timezone.utc).isoformat(), payload.participant_id]
+            for r in buffered:
+                row.extend(r)  # article_id, domain, q1_label, q2_sentence, q3_bi, q3_other, correct
+            await append_response(row)
+            _mark_response_written(payload.participant_id)
+
         return {"status": "saved"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

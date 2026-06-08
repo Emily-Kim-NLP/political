@@ -9,10 +9,10 @@ backend/credentials.json
 
 # Node
 frontend/node_modules/
-frontend/dist/
 
-# Data (raw Excel)
+# Data (raw Excel & runtime DB)
 data/*.xlsx
+data/assignment.db
 
 # OS
 .DS_Store

@@ -1,4 +1,5 @@
 import os
+import json
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
@@ -16,9 +17,9 @@ RESPONSE_SHEET    = "responses"
 PARTICIPANT_SHEET = "participants"
 LIKERT_SHEET      = "likert"
 
-RESPONSE_HEADERS = [
-    "timestamp", "participant_id", "article_id", "domain", "version",
-    "q1_label", "q2_sentence", "q3_bi", "q3_other"
+_Q_COLS = ["article_id", "domain", "q1_label", "q2_sentence", "q3_bi", "q3_other", "correct"]
+RESPONSE_HEADERS = ["timestamp", "participant_id"] + [
+    f"Q{i}_{col}" for i in range(1, 13) for col in _Q_COLS
 ]
 PARTICIPANT_HEADERS = [
     "timestamp", "participant_id", "age", "grade", "major",
@@ -30,16 +31,24 @@ LIKERT_HEADERS = [
     "eco_1", "eco_2", "eco_3", "eco_4", "eco_5", "eco_6",
 ]
 
-_executor = ThreadPoolExecutor(max_workers=5)
+_executor = ThreadPoolExecutor(max_workers=20)
 _response_header_ensured    = False
 _participant_header_ensured = False
 _likert_header_ensured      = False
 
 
 def _get_service():
-    creds = service_account.Credentials.from_service_account_file(
-        CREDENTIALS_FILE, scopes=SCOPES
-    )
+    if os.path.exists(CREDENTIALS_FILE):
+        creds = service_account.Credentials.from_service_account_file(
+            CREDENTIALS_FILE, scopes=SCOPES
+        )
+    else:
+        creds_json = os.getenv("GOOGLE_CREDENTIALS_JSON")
+        if not creds_json:
+            raise RuntimeError("credentials.json not found and GOOGLE_CREDENTIALS_JSON env var not set")
+        creds = service_account.Credentials.from_service_account_info(
+            json.loads(creds_json), scopes=SCOPES
+        )
     return build("sheets", "v4", credentials=creds)
 
 

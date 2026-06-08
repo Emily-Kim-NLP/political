@@ -28,6 +28,21 @@ button {
   font-family: inherit;
 }
 
+/* 기사 문장 행: 데스크탑 번호-옆, 모바일 번호-위 */
+.sentence-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+@media (max-width: 768px) {
+  .sentence-row {
+    flex-direction: column;
+    gap: 4px;
+  }
+}
+
 textarea {
   font-family: inherit;
 }
+

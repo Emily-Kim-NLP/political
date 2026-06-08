@@ -38,8 +38,8 @@ export default function ArticlePanel({
           <div
             key={sentence.id}
             onClick={() => canClick && onSelectSentence(sentence.id)}
+            className="sentence-row"
             style={{
-              display: 'flex', gap: 10, alignItems: 'flex-start',
               padding: '8px 10px', borderRadius: 8,
               border: `2px solid ${isSelected ? accentColor : 'transparent'}`,
               background: isSelected

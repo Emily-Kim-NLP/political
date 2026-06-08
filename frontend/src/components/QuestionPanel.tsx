@@ -3,6 +3,7 @@ import { BI_OPTIONS } from '../types'
 
 interface Props {
   step: Step
+  category: string
   q1: Orientation
   setQ1: (v: Orientation) => void
   q2: number | null
@@ -20,7 +21,7 @@ interface Props {
 }
 
 export default function QuestionPanel({
-  step, q1, setQ1, q2, q3, setQ3, q3Other, setQ3Other,
+  step, category, q1, setQ1, q2, q3, setQ3, q3Other, setQ3Other,
   accentColor, onPrev, onNext, canNext, saving, saveError, isLast,
 }: Props) {
   return (
@@ -31,6 +32,18 @@ export default function QuestionPanel({
         border: '1px solid #e5e7eb', borderRadius: 12,
         padding: 24, background: '#fff', flex: 1, overflowY: 'auto',
       }}>
+
+        {/* 카테고리 */}
+        {category && (
+          <div style={{
+            display: 'inline-block',
+            fontSize: 12, fontWeight: 700, color: '#374151',
+            background: '#e5e7eb', border: '1px solid #9ca3af',
+            borderRadius: 6, padding: '4px 10px', marginBottom: 14,
+          }}>
+            {category}
+          </div>
+        )}
 
         {/* Q1 */}
         {step === 0 && (

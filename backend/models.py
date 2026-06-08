@@ -18,6 +18,7 @@ class ResponsePayload(BaseModel):
     article_id: str
     domain: str
     version: str
+    category: str
     q1_label: str
     q2_sentence: int
     q3_bi: str
